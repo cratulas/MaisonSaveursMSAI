@@ -1,4 +1,3 @@
-// ia-service/src/main/java/com/saveursmaison/ia/dto/PairingChatRequest.java
 package com.saveursmaison.ia.dto;
 
 import java.util.List;
