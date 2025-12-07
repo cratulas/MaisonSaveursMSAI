@@ -25,7 +25,7 @@ public class PairingLogRepository {
         try {
             firestore.collection(COLLECTION_NAME)
                     .add(log)
-                    .get(); // opcional: bloquear hasta que termine
+                    .get(); 
         } catch (InterruptedException | ExecutionException e) {
             // Si falla el log, NO debemos romper la respuesta al usuario.
             e.printStackTrace();

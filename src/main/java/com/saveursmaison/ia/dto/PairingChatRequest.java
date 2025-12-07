@@ -1,3 +1,4 @@
+// ia-service/src/main/java/com/saveursmaison/ia/dto/PairingChatRequest.java
 package com.saveursmaison.ia.dto;
 
 import java.util.List;
@@ -8,8 +9,8 @@ public class PairingChatRequest {
     private String locale; // "en", "fr", "es"
     private List<String> selectedWineIds;
     private List<String> selectedCheeseIds;
+    private String userId;
 
-    // Getters & setters
     public String getMessage() {
         return message;
     }
@@ -40,5 +41,13 @@ public class PairingChatRequest {
 
     public void setSelectedCheeseIds(List<String> selectedCheeseIds) {
         this.selectedCheeseIds = selectedCheeseIds;
+    }
+
+    public String getUserId() {
+        return userId;
+    }
+
+    public void setUserId(String userId) {
+        this.userId = userId;
     }
 }

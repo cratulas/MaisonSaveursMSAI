@@ -4,7 +4,6 @@ import java.util.List;
 
 /**
  * Representa la respuesta estructurada que esperamos de la IA.
- * Debe coincidir con el JSON que pedimos en el prompt.
  */
 public class AiPairingResult {
 

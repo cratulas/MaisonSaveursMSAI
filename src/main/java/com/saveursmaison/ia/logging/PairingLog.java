@@ -17,9 +17,9 @@ import java.util.List;
 @AllArgsConstructor
 public class PairingLog {
 
-    private String userId;                 // opcional, por ahora null
+    private String userId;
     private String locale;
-    private String source;                 // "prompt", "selection", etc.
+    private String source; // "prompt", "selection", etc.
 
     private String message;
     private List<String> selectedWineIds;

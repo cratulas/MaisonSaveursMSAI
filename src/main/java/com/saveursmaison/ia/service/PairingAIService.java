@@ -36,30 +36,67 @@ public class PairingAIService {
      * Prompt de sistema para guiar al modelo.
      */
     private static final String SYSTEM_PROMPT = """
-            You are the AI sommelier of the Saveurs Maison app.
+        You are the AI sommelier of the Saveurs Maison app.
 
-            Your job is to recommend WINE and CHEESE PAIRINGS
-            using ONLY products from our catalog.
+        Your job is to recommend wine and/or cheese using ONLY products from our catalog.
 
-            Rules:
-            - Answer in a friendly tone, but concise.
-            - ONLY use wines and cheeses that appear in the catalog list provided.
-            - ALWAYS, when you mention a wine or cheese from the catalog in the answer text,
-              write it like: ProductName (ID: <product-id>).
-            - If the user asks for something we don't have, suggest the closest
-              style using our catalog.
+        First, you MUST infer what the user is asking:
 
-            OUTPUT FORMAT (VERY IMPORTANT):
-            - You MUST respond ONLY with a single JSON object.
-            - Do NOT include any markdown, explanation, or extra text.
-            - The JSON MUST have exactly these fields:
-              {
-                "answer": "final answer text in the user's language",
-                "recommendedWineIds": ["id1", "id2"],
-                "recommendedCheeseIds": ["id3", "id4"]
-              }
-            - If you do not want to recommend any wine or cheese, use an empty array [].
-            """;
+        1) CHEESE ONLY
+        - If the user clearly asks ONLY for cheeses
+          (e.g. "recommend me a cheese", "solo un queso",
+           "what cheese goes with Pinot Noir", etc.),
+          then you must recommend ONLY cheeses from the catalog.
+        - "recommendedCheeseIds" must contain one or more IDs.
+        - "recommendedWineIds" MUST be an empty array [].
+        - In the textual "answer" you can mention the wine
+          the user already gave (e.g. "your Pinot Noir"),
+          but you MUST NOT introduce any new wine product from the catalog
+          by ID or by name beyond what is necessary.
+
+        2) WINE ONLY
+        - If the user clearly asks ONLY for wines
+          (e.g. "recommend me a red wine", "solo un vino",
+           "what wine goes with this cheese", etc.),
+          then you must recommend ONLY wines from the catalog.
+        - "recommendedWineIds" must contain one or more IDs.
+        - "recommendedCheeseIds" MUST be an empty array [].
+        - In the textual "answer" you can mention the cheese
+          the user already gave, but you MUST NOT introduce any new cheese
+          product from the catalog beyond what is necessary.
+
+        3) PAIRING (BOTH)
+        - If the user asks for a pairing or is ambiguous
+          (e.g. "recommend a pairing", "vino y queso", etc.),
+          then you can recommend BOTH a wine and a cheese.
+        - In that case, both "recommendedWineIds" and "recommendedCheeseIds"
+          can contain IDs.
+
+        General rules:
+        - Answer in a friendly but concise tone.
+        - ONLY use wines and cheeses that appear in the catalog list provided.
+        - In the "answer" text you MUST NOT show product IDs.
+          Use only the product names (e.g. "Pinot Noir Reserve 2022",
+          "Brie de Meaux AOP").
+        - However, in "recommendedWineIds" and "recommendedCheeseIds"
+          you MUST include the correct catalog product IDs that match
+          the products you mention in the answer.
+        - If the user asks for something we don't have, suggest
+          the closest style using our catalog.
+
+        OUTPUT FORMAT (VERY IMPORTANT):
+        - You MUST respond ONLY with a single JSON object.
+        - Do NOT include any markdown, explanation, or extra text.
+        - The JSON MUST have exactly these fields:
+          {
+            "answer": "final answer text in the user's language",
+            "recommendedWineIds": ["id1", "id2"],
+            "recommendedCheeseIds": ["id3", "id4"]
+          }
+        - If you do not want to recommend any wine or any cheese,
+          use an empty array [] for that field.
+        - Do NOT add any other fields.
+        """;
 
     public PairingAIService(
             @Qualifier("openAIWebClient") WebClient openAIWebClient,
@@ -118,12 +155,14 @@ public class PairingAIService {
                 cheeseIds
         );
 
-        // 5. Guardar log en Firestore (best-effort: si falla, no rompemos la respuesta)
+        // 5. Guardar log en Firestore
         try {
             PairingLog log = PairingLog.builder()
-                    .userId(null) // más adelante podemos inyectar userId desde el BFF
+                    // si el usuario no está logeado vendrá null,
+                    // si está logeado vendrá el oid/sub desde el BFF
+                    .userId(request.getUserId())
                     .locale(locale)
-                    .source("prompt") // luego podemos diferenciar "prompt" / "selection"
+                    .source("prompt")
                     .message(request.getMessage())
                     .selectedWineIds(request.getSelectedWineIds())
                     .selectedCheeseIds(request.getSelectedCheeseIds())
@@ -217,7 +256,7 @@ public class PairingAIService {
         var request = new ChatCompletionRequest(
                 openAIProperties.getModel(),
                 messages,
-                600,    // max_tokens un poco más alto para JSON + texto
+                600,    // max_tokens 
                 0.3     // temperature baja para respuestas más consistentes
         );
 
@@ -248,10 +287,7 @@ public class PairingAIService {
             // Intentamos parsear directamente el JSON que devuelve el modelo
             return objectMapper.readValue(rawContent, AiPairingResult.class);
         } catch (Exception ex) {
-            // Si el modelo se desvió y metió texto raro, lo registramos
             ex.printStackTrace();
-
-            // Fallback: tratamos el contenido como "answer" plano
             AiPairingResult fallback = new AiPairingResult();
             fallback.setAnswer(rawContent);
             fallback.setRecommendedWineIds(Collections.emptyList());
